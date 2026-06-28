@@ -1,6 +1,5 @@
 name: app-build-action
 
-# 推送 Tag 时触发（必须以 tv_ 开头）
 on:
   push:
     tags:
@@ -13,45 +12,50 @@ jobs:
       contents: write
 
     steps:
-      # 1. 签出代码（指定 master 分支）
       - uses: actions/checkout@v4
         with:
           ref: master
 
-      # 2. 设置 Java 环境
       - uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
           cache: "gradle"
 
-      # 3. 设置 Flutter（版本 3.38.x）
       - name: Flutter action
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.38.x"
           cache: true
 
-      # 4. 进入子目录，获取依赖
+      # ⭐ 自动修复 build.gradle.kts 中的类型转换错误
+      - name: Fix build.gradle.kts
+        run: |
+          cd simple_live_tv_app/android/app
+          # 将 'as String' 替换为 '?: ""' （安全转换）
+          sed -i '' 's/getProperty("storeFile") as String/getProperty("storeFile") ?: ""/g' build.gradle.kts
+          sed -i '' 's/getProperty("storePassword") as String/getProperty("storePassword") ?: ""/g' build.gradle.kts
+          sed -i '' 's/getProperty("keyPassword") as String/getProperty("keyPassword") ?: ""/g' build.gradle.kts
+          sed -i '' 's/getProperty("keyAlias") as String/getProperty("keyAlias") ?: ""/g' build.gradle.kts
+          # 如果文件是 Groovy 则换成 .gradle，但这里是 .kts
+          cat build.gradle.kts  # 可选，查看修改结果
+
       - name: Restore packages
         run: |
           cd simple_live_tv_app
           flutter pub get
 
-      # 5. 构建 Debug APK（自动使用调试证书签名，可直接安装到 TV）
       - name: Build APK (Debug)
         run: |
           cd simple_live_tv_app
-          flutter build apk --debug   # ⬅️ 关键改动：不用 --release，无需签名
+          flutter build apk --debug
 
-      # 6. 上传 APK 到 Artifacts（用于临时查看）
       - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: android_tv_debug
           path: simple_live_tv_app/build/app/outputs/flutter-apk/app-debug.apk
 
-      # 7. 读取版本信息（从 json 文件）
       - name: Read version
         id: version
         uses: juliangruber/read-file-action@v1
@@ -64,9 +68,8 @@ jobs:
       - name: Echo version content
         run: echo "${{ fromJson(steps.version.outputs.content).version_desc }}"
 
-      # 8. 上传到 Release（只上传一个 debug.apk）
       - name: Upload Release
-        uses: softprops/action-gh-release@v2   # 升级到 v2，更稳定
+        uses: softprops/action-gh-release@v2
         with:
           name: "${{ fromJson(steps.version.outputs.content).version }}"
           body: "# Android TV \n${{ fromJson(steps.version.outputs.content).version_desc }}"
@@ -75,5 +78,4 @@ jobs:
           files: |
             simple_live_tv_app/build/app/outputs/flutter-apk/app-debug.apk
 
-      # 9. 输出构建状态
       - run: echo "🍏 This job's status is ${{ job.status }}."
