@@ -28,21 +28,18 @@ jobs:
           flutter-version: "3.38.x"
           cache: true
 
-      # ⭐ 精准修复：将 keystoreProperties["..."] as String 替换为 ?: ""
+      # ⭐ 精准修复：将 as String 替换为 as? String ?: ""
       - name: Auto-fix build.gradle.kts
         run: |
           cd simple_live_tv_app/android/app
-          echo "📄 原始文件内容（第40-50行）："
+          echo "📄 原始关键行（第40-50行）："
           sed -n '40,50p' build.gradle.kts
           echo ""
           echo "🔧 开始修复..."
-          # 替换 keyAlias, keyPassword, storePassword 这三行
-          sed -i '' -E 's/keyAlias = keystoreProperties\["keyAlias"\] as String/keyAlias = keystoreProperties["keyAlias"] ?: ""/g' build.gradle.kts
-          sed -i '' -E 's/keyPassword = keystoreProperties\["keyPassword"\] as String/keyPassword = keystoreProperties["keyPassword"] ?: ""/g' build.gradle.kts
-          sed -i '' -E 's/storePassword = keystoreProperties\["storePassword"\] as String/storePassword = keystoreProperties["storePassword"] ?: ""/g' build.gradle.kts
-          # storeFile 已经有 ?.let 处理，无需改动
+          # 将 keystoreProperties["..."] as String 替换为 keystoreProperties["..."] as? String ?: ""
+          sed -i '' -E 's/keystoreProperties\["([^"]*)"\] as String/keystoreProperties["\1"] as? String ?: ""/g' build.gradle.kts
           echo "✅ 修复完成！"
-          echo "修改后的内容（第40-50行）："
+          echo "修改后的关键行："
           sed -n '40,50p' build.gradle.kts
 
       - name: Restore packages
