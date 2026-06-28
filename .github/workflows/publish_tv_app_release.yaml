@@ -1,79 +1,79 @@
 name: app-build-action
-#推送Tag时触发
+
+# 推送 Tag 时触发（必须以 tv_ 开头）
 on:
   push:
     tags:
       - "tv_*"
+
 jobs:
   build-tv:
     runs-on: macos-latest
     permissions:
       contents: write
+
     steps:
-      #签出代码
+      # 1. 签出代码（指定 master 分支）
       - uses: actions/checkout@v4
         with:
           ref: master
 
-      # 设置JAVA环境
+      # 2. 设置 Java 环境
       - uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
           cache: "gradle"
 
-      #设置Flutter
+      # 3. 设置 Flutter（版本 3.38.x）
       - name: Flutter action
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.38.x"
           cache: true
 
-      #更新Flutter的packages
+      # 4. 进入子目录，获取依赖
       - name: Restore packages
         run: |
           cd simple_live_tv_app
           flutter pub get
 
-      #打包APK
-      - name: Build APK
+      # 5. 构建 Debug APK（自动使用调试证书签名，可直接安装到 TV）
+      - name: Build APK (Debug)
         run: |
           cd simple_live_tv_app
-          flutter build apk --release --split-per-abi
+          flutter build apk --debug   # ⬅️ 关键改动：不用 --release，无需签名
 
-      #上传APK至Artifacts
+      # 6. 上传 APK 到 Artifacts（用于临时查看）
       - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android_tv
-          path: |
-            simple_live_tv_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            simple_live_tv_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            simple_live_tv_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
+          name: android_tv_debug
+          path: simple_live_tv_app/build/app/outputs/flutter-apk/app-debug.apk
 
-      #读取版本信息
+      # 7. 读取版本信息（从 json 文件）
       - name: Read version
         id: version
         uses: juliangruber/read-file-action@v1
         with:
           path: assets/tv_app_version.json
+
       - name: Echo version
         run: echo "${{ fromJson(steps.version.outputs.content).version }}"
+
       - name: Echo version content
         run: echo "${{ fromJson(steps.version.outputs.content).version_desc }}"
 
-      #上传至Release
+      # 8. 上传到 Release（只上传一个 debug.apk）
       - name: Upload Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2   # 升级到 v2，更稳定
         with:
           name: "${{ fromJson(steps.version.outputs.content).version }}"
           body: "# Android TV \n${{ fromJson(steps.version.outputs.content).version_desc }}"
           prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
           token: ${{ secrets.TOKEN }}
           files: |
-            simple_live_tv_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
-            simple_live_tv_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            simple_live_tv_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-debug.apk
 
-      #完成
+      # 9. 输出构建状态
       - run: echo "🍏 This job's status is ${{ job.status }}."
