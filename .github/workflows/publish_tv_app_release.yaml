@@ -28,17 +28,20 @@ jobs:
           flutter-version: "3.38.x"
           cache: true
 
-      # ⭐ 自动修复 build.gradle.kts 中的类型转换错误
-      - name: Fix build.gradle.kts
+      # ⭐ 强力修复 build.gradle.kts（自动处理所有不安全的类型转换）
+      - name: Auto-fix build.gradle.kts
         run: |
           cd simple_live_tv_app/android/app
-          # 将 'as String' 替换为 '?: ""' （安全转换）
-          sed -i '' 's/getProperty("storeFile") as String/getProperty("storeFile") ?: ""/g' build.gradle.kts
-          sed -i '' 's/getProperty("storePassword") as String/getProperty("storePassword") ?: ""/g' build.gradle.kts
-          sed -i '' 's/getProperty("keyPassword") as String/getProperty("keyPassword") ?: ""/g' build.gradle.kts
-          sed -i '' 's/getProperty("keyAlias") as String/getProperty("keyAlias") ?: ""/g' build.gradle.kts
-          # 如果文件是 Groovy 则换成 .gradle，但这里是 .kts
-          cat build.gradle.kts  # 可选，查看修改结果
+          echo "📄 原始文件内容（前50行）："
+          head -n 50 build.gradle.kts
+          echo ""
+          echo "🔧 开始修复..."
+          # 将所有的 getProperty("xxx") as String 替换为 getProperty("xxx") ?: ""
+          sed -i '' -E 's/(getProperty\([^)]*\))[[:space:]]*as[[:space:]]*String/\1 ?: ""/g' build.gradle.kts
+          # 如果还有 .getProperty 或 getProperty 前面有空格的情况
+          sed -i '' -E 's/(\.getProperty\([^)]*\))[[:space:]]*as[[:space:]]*String/\1 ?: ""/g' build.gradle.kts
+          echo "✅ 修复完成！修改后的内容（第40-50行）："
+          sed -n '40,50p' build.gradle.kts
 
       - name: Restore packages
         run: |
