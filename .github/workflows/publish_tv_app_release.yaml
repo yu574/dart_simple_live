@@ -28,35 +28,41 @@ jobs:
           flutter-version: "3.38.x"
           cache: true
 
-      # 修复 build.gradle.kts 中的类型转换错误
-      - name: Auto-fix build.gradle.kts
+      # 解码密钥（注意路径）
+      - name: Decode keystore
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          fileName: 'keystore.jks'
+          encodedString: ${{ secrets.TV_KEYSTORE_BASE64 }}
+
+      # 创建 key.properties
+      - name: Create key.properties
         run: |
-          cd simple_live_tv_app/android/app
-          echo "📄 原始关键行（第40-50行）："
-          sed -n '40,50p' build.gradle.kts
-          echo ""
-          echo "🔧 开始修复..."
-          # 将 keystoreProperties["..."] as String 替换为 keystoreProperties["..."] as? String ?: ""
-          sed -i '' -E 's/keystoreProperties\["([^"]*)"\] as String/keystoreProperties["\1"] as? String ?: ""/g' build.gradle.kts
-          echo "✅ 修复完成！"
-          echo "修改后的关键行："
-          sed -n '40,50p' build.gradle.kts
+          cd simple_live_tv_app/android
+          echo "storeFile=${{ github.workspace }}/keystore.jks" > key.properties
+          echo "storePassword=${{ secrets.TV_STORE_PASSWORD }}" >> key.properties
+          echo "keyPassword=${{ secrets.TV_KEY_PASSWORD }}" >> key.properties
+          echo "keyAlias=${{ secrets.TV_KEY_ALIAS }}" >> key.properties
 
       - name: Restore packages
         run: |
           cd simple_live_tv_app
           flutter pub get
 
-      - name: Build APK (Debug)
+      # 构建 Release + 拆分 ABI
+      - name: Build Release APK (split ABI)
         run: |
           cd simple_live_tv_app
-          flutter build apk --debug
+          flutter build apk --release --split-per-abi
 
-      - name: Upload APK to Artifacts
+      - name: Upload APKs to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android_tv_debug
-          path: simple_live_tv_app/build/app/outputs/flutter-apk/app-debug.apk
+          name: android_tv_release
+          path: |
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
 
       - name: Read version
         id: version
@@ -70,15 +76,16 @@ jobs:
       - name: Echo version content
         run: echo "${{ fromJson(steps.version.outputs.content).version_desc }}"
 
-      # ⭐ 关键修复：使用 GITHUB_TOKEN 而不是自定义 TOKEN
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         with:
           name: "${{ fromJson(steps.version.outputs.content).version }}"
           body: "# Android TV \n${{ fromJson(steps.version.outputs.content).version_desc }}"
           prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
-          token: ${{ secrets.GITHUB_TOKEN }}   # 改为 GITHUB_TOKEN
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            simple_live_tv_app/build/app/outputs/flutter-apk/app-debug.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
 
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+      - run: echo "🍏 Done"
