@@ -28,14 +28,14 @@ jobs:
           flutter-version: "3.38.x"
           cache: true
 
-      # 解码密钥（注意路径）
+      # ⭐ 解码你的密钥库（使用你设置的 Secret）
       - name: Decode keystore
         uses: timheuer/base64-to-file@v1.2
         with:
           fileName: 'keystore.jks'
           encodedString: ${{ secrets.TV_KEYSTORE_BASE64 }}
 
-      # 创建 key.properties
+      # ⭐ 创建 key.properties（指向解码后的文件）
       - name: Create key.properties
         run: |
           cd simple_live_tv_app/android
@@ -44,12 +44,18 @@ jobs:
           echo "keyPassword=${{ secrets.TV_KEY_PASSWORD }}" >> key.properties
           echo "keyAlias=${{ secrets.TV_KEY_ALIAS }}" >> key.properties
 
+      # 修复 build.gradle.kts 类型转换（保留以防万一）
+      - name: Auto-fix build.gradle.kts
+        run: |
+          cd simple_live_tv_app/android/app
+          sed -i '' -E 's/keystoreProperties\["([^"]*)"\] as String/keystoreProperties["\1"] as? String ?: ""/g' build.gradle.kts
+
       - name: Restore packages
         run: |
           cd simple_live_tv_app
           flutter pub get
 
-      # 构建 Release + 拆分 ABI
+      # ⭐ 构建 Release + 拆分 ABI（体积小，性能好）
       - name: Build Release APK (split ABI)
         run: |
           cd simple_live_tv_app
