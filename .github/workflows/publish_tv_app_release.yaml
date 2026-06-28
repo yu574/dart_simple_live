@@ -28,7 +28,7 @@ jobs:
           flutter-version: "3.38.x"
           cache: true
 
-      # ⭐ 精准修复：将 as String 替换为 as? String ?: ""
+      # 修复 build.gradle.kts 中的类型转换错误
       - name: Auto-fix build.gradle.kts
         run: |
           cd simple_live_tv_app/android/app
@@ -70,13 +70,14 @@ jobs:
       - name: Echo version content
         run: echo "${{ fromJson(steps.version.outputs.content).version_desc }}"
 
+      # ⭐ 关键修复：使用 GITHUB_TOKEN 而不是自定义 TOKEN
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         with:
           name: "${{ fromJson(steps.version.outputs.content).version }}"
           body: "# Android TV \n${{ fromJson(steps.version.outputs.content).version_desc }}"
           prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
-          token: ${{ secrets.TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}   # 改为 GITHUB_TOKEN
           files: |
             simple_live_tv_app/build/app/outputs/flutter-apk/app-debug.apk
 
