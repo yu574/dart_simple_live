@@ -28,12 +28,17 @@ jobs:
           flutter-version: "3.38.x"
           cache: true
 
-      # ⭐ 解码你的密钥库（使用你设置的 Secret）
+      # ⭐ 手动解码 Base64 为 keystore.jks（比第三方 Action 更可靠）
       - name: Decode keystore
-        uses: timheuer/base64-to-file@v1.2
-        with:
-          fileName: 'keystore.jks'
-          encodedString: ${{ secrets.TV_KEYSTORE_BASE64 }}
+        run: |
+          echo "${{ secrets.TV_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/keystore.jks
+          if [ -f "${{ github.workspace }}/keystore.jks" ]; then
+            echo "✅ keystore.jks created successfully"
+            ls -la ${{ github.workspace }}/keystore.jks
+          else
+            echo "❌ Failed to create keystore.jks"
+            exit 1
+          fi
 
       # ⭐ 创建 key.properties（指向解码后的文件）
       - name: Create key.properties
@@ -43,8 +48,10 @@ jobs:
           echo "storePassword=${{ secrets.TV_STORE_PASSWORD }}" >> key.properties
           echo "keyPassword=${{ secrets.TV_KEY_PASSWORD }}" >> key.properties
           echo "keyAlias=${{ secrets.TV_KEY_ALIAS }}" >> key.properties
+          echo "✅ key.properties content:"
+          cat key.properties
 
-      # 修复 build.gradle.kts 类型转换（保留以防万一）
+      # 修复 build.gradle.kts 类型转换
       - name: Auto-fix build.gradle.kts
         run: |
           cd simple_live_tv_app/android/app
@@ -55,7 +62,6 @@ jobs:
           cd simple_live_tv_app
           flutter pub get
 
-      # ⭐ 构建 Release + 拆分 ABI（体积小，性能好）
       - name: Build Release APK (split ABI)
         run: |
           cd simple_live_tv_app
